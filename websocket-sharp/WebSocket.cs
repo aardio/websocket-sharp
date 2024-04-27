@@ -753,6 +753,29 @@ namespace WebSocketSharp
       }
     }
 
+
+    private NameValueCollection _customHeader = new NameValueCollection();
+         
+    public void SetHeader(string name, string value = null)
+    {
+            if( value != null)
+            {
+                if (_customHeader[name] == null)
+                {
+                    _customHeader.Add(name, value);
+                }
+                else
+                {
+                    _customHeader[name] = value;
+                }
+            }
+            else if( _customHeader[name] != null)
+            {
+                _customHeader.Remove(name);
+            }
+    }
+
+
     #endregion
 
     #region Public Events
@@ -1414,39 +1437,53 @@ namespace WebSocketSharp
     // As client
     private HttpRequest createHandshakeRequest ()
     {
-      var ret = HttpRequest.CreateWebSocketHandshakeRequest (_uri);
+            var ret = HttpRequest.CreateWebSocketHandshakeRequest(_uri);
 
-      var headers = ret.Headers;
+            var headers = ret.Headers;
 
-      headers["Sec-WebSocket-Key"] = _base64Key;
-      headers["Sec-WebSocket-Version"] = _version;
+            if (!_origin.IsNullOrEmpty())
+                headers["Origin"] = _origin;
 
-      if (!_origin.IsNullOrEmpty ())
-        headers["Origin"] = _origin;
+            if (_protocols != null)
+            {
+                headers["Sec-WebSocket-Protocol"] = _protocols.ToString(", ");
 
-      if (_protocols != null) {
-        headers["Sec-WebSocket-Protocol"] = _protocols.ToString (", ");
+                _protocolsRequested = true;
+            } 
 
-        _protocolsRequested = true;
-      }
+            var exts = createExtensions();
 
-      var exts = createExtensions ();
+            if (exts != null)
+            {
+                headers["Sec-WebSocket-Extensions"] = exts;
 
-      if (exts != null) {
-        headers["Sec-WebSocket-Extensions"] = exts;
+                _extensionsRequested = true;
+            }
 
-        _extensionsRequested = true;
-      }
+            var ares = createAuthenticationResponse();
 
-      var ares = createAuthenticationResponse ();
+            if (ares != null)
+                headers["Authorization"] = ares.ToString();
 
-      if (ares != null)
-        headers["Authorization"] = ares.ToString ();
+            if (_cookies.Count > 0)
+                ret.SetCookies(_cookies);
 
-      if (_cookies.Count > 0)
-        ret.SetCookies (_cookies);
+            foreach (string name in _customHeader.AllKeys)
+            {
+                if (headers[name] == null)
+                {
+                    headers.Add(name, _customHeader[name]);
+                }
+                else
+                {
+                    headers[name] = _customHeader[name];
+                }
+            }
 
-      return ret;
+            headers["Sec-WebSocket-Key"] = _base64Key;
+            headers["Sec-WebSocket-Version"] = _version; 
+
+            return ret;
     }
 
     // As server
